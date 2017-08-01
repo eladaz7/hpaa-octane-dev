@@ -72,10 +72,6 @@ public class LogDispatcher extends AbstractSafeLoggingAsyncPeriodWork {
 		if (logsQueue.peekFirst() == null) {
 			return;
 		}
-		if (retryModel.isQuietPeriod()) {
-			logger.info("There are pending logs, but we are in quiet period");
-			return;
-		}
 
 		MqmRestClient mqmRestClient = initMqmRestClient();
 		if (mqmRestClient == null) {
@@ -90,6 +86,11 @@ public class LogDispatcher extends AbstractSafeLoggingAsyncPeriodWork {
 		ResultQueue.QueueItem item;
 
 		while ((item = logsQueue.peekFirst()) != null) {
+
+			if (retryModel.isQuietPeriod()) {
+				logger.info("There are pending logs, but we are in quiet period");
+				return;
+			}
 
 			Run build = getBuildFromQueueItem(item);
 			if (build == null) {
