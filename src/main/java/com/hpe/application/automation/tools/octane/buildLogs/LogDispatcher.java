@@ -16,13 +16,12 @@
 
 package com.hpe.application.automation.tools.octane.buildLogs;
 
+import com.google.common.primitives.Longs;
 import com.google.inject.Inject;
 import com.hp.mqm.client.MqmRestClient;
 import com.hp.mqm.client.exception.RequestErrorException;
 import com.hpe.application.automation.tools.octane.ResultQueue;
-import com.hpe.application.automation.tools.octane.client.JenkinsMqmRestClientFactory;
-import com.hpe.application.automation.tools.octane.client.JenkinsMqmRestClientFactoryImpl;
-import com.hpe.application.automation.tools.octane.client.RetryModel;
+import com.hpe.application.automation.tools.octane.client.*;
 import com.hpe.application.automation.tools.octane.configuration.ConfigurationService;
 import com.hpe.application.automation.tools.octane.configuration.ServerConfiguration;
 import com.hpe.application.automation.tools.octane.tests.AbstractSafeLoggingAsyncPeriodWork;
@@ -39,6 +38,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -56,15 +56,26 @@ public class LogDispatcher extends AbstractSafeLoggingAsyncPeriodWork {
 	private static final ExecutorService logDispatcherExecutors = Executors.newFixedThreadPool(20, new NamedThreadFactory(LogDispatcher.class.getSimpleName()));
 
 	private static final String OCTANE_LOG_FILE_NAME = "octane_log";
+	private static final int MAX_RETRIES = 6;
 
-	@Inject
 	private RetryModel retryModel;
-
 	private JenkinsMqmRestClientFactory clientFactory;
-	private ResultQueue logsQueue;
+	private final ResultQueue logsQueue;
 
-	public LogDispatcher() {
+	public LogDispatcher() throws IOException {
 		super("Octane log dispatcher");
+		logsQueue = new LogsResultQueue(MAX_RETRIES);
+	}
+
+	private long[] getQuietPeriodsInMinutes(double retries) {
+		double base = 2;
+		double exponent = 0;
+		List<Long> quietPeriods = new ArrayList<>();
+		while (exponent <= retries) {
+			quietPeriods.add(TimeUnit2.MINUTES.toMillis((long) Math.pow(base, exponent)));
+			exponent++;
+		}
+		return Longs.toArray(quietPeriods);
 	}
 
 	@Override
@@ -78,17 +89,14 @@ public class LogDispatcher extends AbstractSafeLoggingAsyncPeriodWork {
 			logger.warn("There are pending build logs, but MQM server location is not specified, build logs can't be submitted");
 			logsQueue.remove();
 			return;
-		} else {
-			logger.info("There are pending build logs, connecting to the MQM server");
 		}
-
 
 		ResultQueue.QueueItem item;
 
 		while ((item = logsQueue.peekFirst()) != null) {
 
 			if (retryModel.isQuietPeriod()) {
-				logger.info("There are pending logs, but we are in quiet period");
+				logger.debug("There are pending logs, but we are in quiet period");
 				return;
 			}
 
@@ -142,11 +150,11 @@ public class LogDispatcher extends AbstractSafeLoggingAsyncPeriodWork {
 							logsQueue.remove();
 						} else {
 							logger.error("failed to send log for build " + item.getProjectName() + " #" + item.getBuildNumber() + " to workspace " + item.getWorkspace());
-							reAttempt();
+							reAttempt(item.getProjectName(), item.getBuildNumber());
 						}
 					} catch (RequestErrorException ree) {
 						logger.error("failed to send log for build " + item.getProjectName() + " #" + item.getBuildNumber() + " to workspace " + item.getWorkspace(), ree);
-						reAttempt();
+						reAttempt(item.getProjectName(), item.getBuildNumber());
 					} catch (Exception e) {
 						logger.error("fatally failed to send log for build " + item.getProjectName() + " #" + item.getBuildNumber() + " to workspace " + item.getWorkspace() + ", will not retry this one", e);
 						retryModel.success();
@@ -154,17 +162,17 @@ public class LogDispatcher extends AbstractSafeLoggingAsyncPeriodWork {
 					}
 				}
 			} catch (Exception e) {
-				logger.error("failed to fetch relevant workspaces");
+				logger.error("fatally failed to fetch relevant workspaces OR to send log for build " + item.getProjectName() + " #" + item.getBuildNumber() + " to workspace " + item.getWorkspace() + ", will not retry this one", e);
 			}
 		}
 	}
 
-	private void reAttempt() {
+	private void reAttempt(String projectName, int buildNumber) {
 		if (!logsQueue.failed()) {
-			logger.warn("maximum number of attempts reached, operation will not be re-attempted for this build");
+			logger.warn("maximum number of attempts reached, operation will not be re-attempted for build "+ projectName + " #" + buildNumber);
 			retryModel.success();
-			logsQueue.remove();
 		} else {
+			logger.info("There are pending logs, but we are in quiet period");
 			retryModel.failure();
 		}
 	}
@@ -219,13 +227,13 @@ public class LogDispatcher extends AbstractSafeLoggingAsyncPeriodWork {
 	}
 
 	@Inject
-	public void setMqmRestClientFactory(JenkinsMqmRestClientFactoryImpl clientFactory) {
-		this.clientFactory = clientFactory;
+	public void setEventPublisher(JenkinsInsightEventPublisher eventPublisher) {
+		this.retryModel = new RetryModel(eventPublisher, getQuietPeriodsInMinutes(MAX_RETRIES));
 	}
 
 	@Inject
-	public void setLogResultQueue(LogAbstractResultQueue queue) {
-		this.logsQueue = queue;
+	public void setMqmRestClientFactory(JenkinsMqmRestClientFactoryImpl clientFactory) {
+		this.clientFactory = clientFactory;
 	}
 
 	private static final class NamedThreadFactory implements ThreadFactory {
@@ -281,11 +289,11 @@ public class LogDispatcher extends AbstractSafeLoggingAsyncPeriodWork {
 				if (status) {
 					logger.info("Successfully sent logs of " + item.getProjectName() + " #" + item.getBuildNumber() + " to workspace " + workspaceId);
 				} else {
-					logger.error("failed to send log for build " + item.getProjectName() + " #" + item.getBuildNumber() + " to workspace " + workspaceId);
+					logger.debug("failed to send log for build " + item.getProjectName() + " #" + item.getBuildNumber() + " to workspace " + workspaceId);
 					logsQueue.add(item.getProjectName(), item.getBuildNumber(), workspaceId);
 				}
 			} catch (RequestErrorException ree) {
-				logger.error("failed to send log for build " + item.getProjectName() + " #" + item.getBuildNumber() + " to workspace " + workspaceId, ree);
+				logger.debug("failed to send log for build " + item.getProjectName() + " #" + item.getBuildNumber() + " to workspace " + workspaceId, ree);
 				logsQueue.add(item.getProjectName(), item.getBuildNumber(), workspaceId);
 			} catch (Exception e) {
 				logger.error("fatally failed to send log for build " + item.getProjectName() + " #" + item.getBuildNumber() + " to workspace " + workspaceId + ", will not retry this one", e);
