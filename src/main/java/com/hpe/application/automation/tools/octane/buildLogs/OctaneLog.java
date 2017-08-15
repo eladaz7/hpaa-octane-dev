@@ -16,11 +16,11 @@ class OctaneLog {
 		this.logStream = new FileInputStream(logFile);
 	}
 
-	private Long getFileLength() {
+	public Long getFileLength() {
 		return this.fileLength;
 	}
 
-	private InputStream getLogStream() {
+	public InputStream getLogStream() {
 		return this.logStream;
 	}
 
