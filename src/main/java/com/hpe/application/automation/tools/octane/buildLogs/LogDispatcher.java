@@ -222,7 +222,7 @@ public class LogDispatcher extends AbstractSafeLoggingAsyncPeriodWork {
 		return TimeUnit2.SECONDS.toMillis(10);
 	}
 
-	private void enqueueLog(String projectName, int buildNumber) {
+	public void enqueueLog(String projectName, int buildNumber) {
 		logsQueue.add(projectName, buildNumber, null);
 	}
 
