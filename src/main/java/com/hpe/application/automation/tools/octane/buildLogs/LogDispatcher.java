@@ -46,10 +46,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.lang.Long.parseLong;
@@ -66,7 +63,7 @@ public class LogDispatcher extends AbstractSafeLoggingAsyncPeriodWork {
 
 	private static final String OCTANE_LOG_FILE_NAME = "octane_log";
 	private static final int MAX_RETRIES = 6;
-	private static final long TIMEOUT = 20*60000;
+	private static final long TIMEOUT = 20;
 
 	private static final double BASE = 2;
 	private static final double EXPONENT = 0;
@@ -141,7 +138,10 @@ public class LogDispatcher extends AbstractSafeLoggingAsyncPeriodWork {
 							));
 						}
 
-						latch.wait(TIMEOUT);
+						boolean completedResult = latch.await(TIMEOUT, TimeUnit.MINUTES);
+						if (completedResult) {
+							logger.error("timed out sending logs to - " + workspaces.size() + " workspaces.");
+						}
 					}
 					logsQueue.remove();
 				} else {
