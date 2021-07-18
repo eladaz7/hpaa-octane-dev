@@ -1,18 +1,42 @@
-// (c) Copyright 2012 Hewlett-Packard Development Company, L.P. 
-// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+/*
+ * Certain versions of software and/or documents ("Material") accessible here may contain branding from
+ * Hewlett-Packard Company (now HP Inc.) and Hewlett Packard Enterprise Company.  As of September 1, 2017,
+ * the Material is now offered by Micro Focus, a separately owned and operated company.  Any reference to the HP
+ * and Hewlett Packard Enterprise/HPE marks is historical in nature, and the HP and Hewlett Packard Enterprise/HPE
+ * marks are the property of their respective owners.
+ * __________________________________________________________________
+ * MIT License
+ *
+ * (c) Copyright 2012-2021 Micro Focus or one of its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+ * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+ * and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all copies or
+ * substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+ * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ * ___________________________________________________________________
+ */
 
-using System;
-using System.Linq;
-using System.IO;
-using System.Xml;
-using QTObjectModelLib;
-using Resources = HpToolsLauncher.Properties.Resources;
-using System.Threading;
-using System.Diagnostics;
-using System.Collections.Generic;
+using HpToolsLauncher.TestRunners;
 using Microsoft.Win32;
+using QTObjectModelLib;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Xml;
+using Resources = HpToolsLauncher.Properties.Resources;
 
 namespace HpToolsLauncher
 {
@@ -20,11 +44,12 @@ namespace HpToolsLauncher
     {
         // Setting keys for mobile
         private const string MOBILE_HOST_ADDRESS = "ALM_MobileHostAddress";
-        private const string MOBILE_HOST_PORT = "MobileHostPort";
-        private const string MOBILE_USER   = "ALM_MobileUserName";
+        private const string MOBILE_HOST_PORT = "ALM_MobileHostPort";
+        private const string MOBILE_USER = "ALM_MobileUserName";
         private const string MOBILE_PASSWORD = "ALM_MobilePassword";
-        private const string MOBILE_USE_SSL = "MobileUseSSL";
-        private const string MOBILE_USE_PROXY= "MobileProxySetting_UseProxy";
+        private const string MOBILE_TENANT = "EXTERNAL_MobileTenantId";
+        private const string MOBILE_USE_SSL = "ALM_MobileUseSSL";
+        private const string MOBILE_USE_PROXY = "MobileProxySetting_UseProxy";
         private const string MOBILE_PROXY_SETTING_ADDRESS = "MobileProxySetting_Address";
         private const string MOBILE_PROXY_SETTING_PORT = "MobileProxySetting_Port";
         private const string MOBILE_PROXY_SETTING_AUTHENTICATION = "MobileProxySetting_Authentication";
@@ -35,6 +60,7 @@ namespace HpToolsLauncher
         private readonly IAssetRunner _runNotifier;
         private readonly object _lockObject = new object();
         private TimeSpan _timeLeftUntilTimeout = TimeSpan.MaxValue;
+        private readonly string _uftRunMode;
         private Stopwatch _stopwatch = null;
         private Application _qtpApplication;
         private ParameterDefinitions _qtpParamDefs;
@@ -49,9 +75,10 @@ namespace HpToolsLauncher
         /// <param name="runNotifier"></param>
         /// <param name="useUftLicense"></param>
         /// <param name="timeLeftUntilTimeout"></param>
-        public GuiTestRunner(IAssetRunner runNotifier, bool useUftLicense, TimeSpan timeLeftUntilTimeout, McConnectionInfo mcConnectionInfo, string mobileInfo)
+        public GuiTestRunner(IAssetRunner runNotifier, bool useUftLicense, TimeSpan timeLeftUntilTimeout, string uftRunMode, McConnectionInfo mcConnectionInfo, string mobileInfo)
         {
             _timeLeftUntilTimeout = timeLeftUntilTimeout;
+            _uftRunMode = uftRunMode;
             _stopwatch = Stopwatch.StartNew();
             _runNotifier = runNotifier;
             _useUFTLicense = useUftLicense;
@@ -74,10 +101,20 @@ namespace HpToolsLauncher
             TestRunResults runDesc = new TestRunResults();
             ConsoleWriter.ActiveTestRun = runDesc;
             ConsoleWriter.WriteLine(DateTime.Now.ToString(Launcher.DateFormat) + " Running: " + testPath);
-            runDesc.ReportLocation = testPath;
-
 
             runDesc.TestPath = testPath;
+
+            // default report location is the test path
+            runDesc.ReportLocation = testPath;
+            // check if the report path has been defined
+            if (!String.IsNullOrEmpty(testinf.ReportPath))
+            {
+                if (!Helper.TrySetTestReportPath(runDesc, testinf, ref errorReason))
+                {
+                    return runDesc;
+                }
+            }
+
             runDesc.TestState = TestState.Unknown;
 
             _runCancelled = runCanclled;
@@ -113,10 +150,22 @@ namespace HpToolsLauncher
                     Version qtpVersion = Version.Parse(_qtpApplication.Version);
                     if (qtpVersion.Equals(new Version(11, 0)))
                     {
-                        runDesc.ReportLocation = Path.Combine(testPath, "Report");
+                        // use the defined report path if provided
+                        if (!String.IsNullOrEmpty(testinf.ReportPath))
+                        {
+                            runDesc.ReportLocation = Path.Combine(testinf.ReportPath, "Report");
+                        }
+                        else
+                        {
+                            runDesc.ReportLocation = Path.Combine(testPath, "Report");
+                        }
+
                         if (Directory.Exists(runDesc.ReportLocation))
                         {
-                            Directory.Delete(runDesc.ReportLocation, true);
+                            int lastIndex = runDesc.ReportLocation.IndexOf("\\");
+                            var location = runDesc.ReportLocation.Substring(0, lastIndex);
+                            var name = runDesc.ReportLocation.Substring(lastIndex + 1);
+                            runDesc.ReportLocation = Helper.GetNextResFolder(location, name);
                             Directory.CreateDirectory(runDesc.ReportLocation);
                         }
                     }
@@ -141,6 +190,11 @@ namespace HpToolsLauncher
                     if (!string.IsNullOrEmpty(_mcConnection.MobileUserName))
                     {
                         _qtpApplication.TDPierToTulip.SetTestOptionsVal(MOBILE_USER, _mcConnection.MobileUserName);
+                    }
+
+                    if (!string.IsNullOrEmpty(_mcConnection.MobileTenantId))
+                    {
+                        _qtpApplication.TDPierToTulip.SetTestOptionsVal(MOBILE_TENANT, _mcConnection.MobileTenantId);
                     }
 
                     if (!string.IsNullOrEmpty(_mcConnection.MobilePassword))
@@ -172,7 +226,7 @@ namespace HpToolsLauncher
                         }
                         _qtpApplication.TDPierToTulip.SetTestOptionsVal(MOBILE_PROXY_SETTING_PASSWORD, encriptedMcProxyPassword);
                     }
-                    
+
                     // Mc info (device, app, launch and terminate data)
                     if (!string.IsNullOrEmpty(_mobileInfo))
                     {
@@ -220,7 +274,9 @@ namespace HpToolsLauncher
                                                  ? tagUnifiedLicenseType.qtUnifiedFunctionalTesting
                                                  : tagUnifiedLicenseType.qtNonUnified);
 
-            if (!HandleInputParameters(testPath, ref errorReason, testinf.GetParameterDictionaryForQTP()))
+            Dictionary<string, object> paramList = testinf.GetParameterDictionaryForQTP();
+
+            if (!HandleInputParameters(testPath, ref errorReason, testinf.GetParameterDictionaryForQTP(), testinf))
             {
                 runDesc.TestState = TestState.Error;
                 runDesc.ErrorDesc = errorReason;
@@ -229,7 +285,6 @@ namespace HpToolsLauncher
 
             GuiTestRunResult guiTestRunResult = ExecuteQTPRun(runDesc);
             runDesc.ReportLocation = guiTestRunResult.ReportPath;
-
             if (!guiTestRunResult.IsSuccess)
             {
                 runDesc.TestState = TestState.Error;
@@ -386,7 +441,10 @@ namespace HpToolsLauncher
                 Type runResultsOptionstype = Type.GetTypeFromProgID("QuickTest.RunResultsOptions");
                 var options = (RunResultsOptions)Activator.CreateInstance(runResultsOptionstype);
                 options.ResultsLocation = testResults.ReportLocation;
-                _qtpApplication.Options.Run.RunMode = "Fast";
+                if (_uftRunMode != null)
+                {
+                    _qtpApplication.Options.Run.RunMode = _uftRunMode;
+                }
 
                 //Check for cancel before executing
                 if (_runCancelled())
@@ -534,7 +592,7 @@ namespace HpToolsLauncher
                     }
                 }
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 errorReason = Resources.QtpNotLaunchedError;
                 return false;
@@ -575,7 +633,7 @@ namespace HpToolsLauncher
             return legal;
         }
 
-        private bool HandleInputParameters(string fileName, ref string errorReason, Dictionary<string, object> inputParams)
+        private bool HandleInputParameters(string fileName, ref string errorReason, Dictionary<string, object> inputParams, TestInfo testInfo)
         {
             try
             {
@@ -612,13 +670,54 @@ namespace HpToolsLauncher
                             }
                             else
                             {
+                                ConsoleWriter.WriteLine(string.Format("Using parameter {0}={1} ", paramName, paramValue));
                                 _qtpParameters[paramName].Value = paramValue;
                             }
                         }
                     }
                 }
+
+                // specify data table path
+                if (testInfo.DataTablePath != null)
+                {
+                    _qtpApplication.Test.Settings.Resources.DataTablePath = testInfo.DataTablePath;
+                    ConsoleWriter.WriteLine("Using external data table: " + testInfo.DataTablePath);
+                }
+
+                // specify iteration mode
+                if (testInfo.IterationInfo != null)
+                {
+                    try
+                    {
+                        IterationInfo ii = testInfo.IterationInfo;
+                        if (!IterationInfo.AvailableTypes.Contains(ii.IterationMode))
+                        {
+                            throw new ArgumentException(String.Format("Illegal iteration mode '{0}'. Available modes are : {1}", ii.IterationMode, string.Join(", ", IterationInfo.AvailableTypes)));
+                        }
+
+                        bool rangeMode = IterationInfo.RANGE_ITERATION_MODE.Equals(ii.IterationMode);
+                        if (rangeMode)
+                        {
+                            int start = Int32.Parse(ii.StartIteration);
+                            int end = Int32.Parse(ii.EndIteration);
+
+                            _qtpApplication.Test.Settings.Run.StartIteration = start;
+                            _qtpApplication.Test.Settings.Run.EndIteration = end;
+                        }
+
+                        _qtpApplication.Test.Settings.Run.IterationMode = testInfo.IterationInfo.IterationMode;
+
+                        ConsoleWriter.WriteLine("Using iteration mode: " + testInfo.IterationInfo.IterationMode +
+                       (rangeMode ? " " + testInfo.IterationInfo.StartIteration + "-" + testInfo.IterationInfo.EndIteration : ""));
+                    }
+                    catch (Exception e)
+                    {
+                        String msg = "Failed to parse 'Iterations' element . Using default iteration settings. Error : " + e.Message;
+                        ConsoleWriter.WriteLine(msg);
+                    }
+                }
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 errorReason = Resources.QtpRunError;
                 return false;
@@ -650,7 +749,7 @@ namespace HpToolsLauncher
                             {
                                 _qtpApplication.Test.Stop();
                             }
-                            catch (Exception e)
+                            catch (Exception)
                             {
                             }
                             finally
@@ -661,7 +760,7 @@ namespace HpToolsLauncher
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
             }
 
@@ -677,8 +776,8 @@ namespace HpToolsLauncher
         /// </summary>
         private void ChangeDCOMSettingToInteractiveUser()
         {
-            string errorMsg = "Unable to change DCOM settings. To chage it manually: " +
-                              "run dcomcnfg.exe -> My Computer -> DCOM Config -> QuickTest Professional Automation -> Identity -> and select The Interactive User";
+            string errorMsg = "Unable to change DCOM settings. To change it manually: " +
+                              "run dcomcnfg.exe -> My Computer -> DCOM Config -> QuickTest Professional Automation -> Identity -> and select The Interactive User. ";
 
             string interactiveUser = "Interactive User";
             string runAs = "RunAs";

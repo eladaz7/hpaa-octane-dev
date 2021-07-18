@@ -1,0 +1,110 @@
+<!--
+  ~ Certain versions of software and/or documents ("Material") accessible here may contain branding from
+  ~ Hewlett-Packard Company (now HP Inc.) and Hewlett Packard Enterprise Company.  As of September 1, 2017,
+  ~ the Material is now offered by Micro Focus, a separately owned and operated company.  Any reference to the HP
+  ~ and Hewlett Packard Enterprise/HPE marks is historical in nature, and the HP and Hewlett Packard Enterprise/HPE
+  ~ marks are the property of their respective owners.
+  ~ __________________________________________________________________
+  ~ MIT License
+  ~
+  ~ (c) Copyright 2012-2021 Micro Focus or one of its affiliates.
+  ~
+  ~ Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+  ~ documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+  ~ the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+  ~ and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+  ~
+  ~ The above copyright notice and this permission notice shall be included in all copies or
+  ~ substantial portions of the Software.
+  ~
+  ~ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+  ~ THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  ~ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+  ~ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  ~ SOFTWARE.
+  ~
+  ~ ___________________________________________________________________
+  -->
+
+<div>
+    Define additional parameters
+    <br/>
+    Format: <b>param_name:param_value</b>
+    <br/>
+    Use a separate line for each parameter. Any line that starts with '#' is defined as a comment and is not parsed.
+    <br/>
+    <br/>
+
+    <table border="1" width="100%" style="border-collapse: collapse;border: 1px solid black;">
+
+        <thead style="background-color: lightgray; font-weight: bold">
+        <tr>
+            <td style="width: 280px">Param name</td>
+            <td style="width: 110px">Value</td>
+            <td>Description</td>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+            <td>ENCODE_CI_JOB_BASE64</td>
+            <td>true/false</td>
+            <td>ALM Octane includes a built-in Jetty web server, but there is a possibility to add an external web server such as Apache HTTP server or similar.
+                This is usually done to add one more security layer. Some such servers might not allow receiving requests with encoded slashes (%2F).
+                As a job name might contain a slash, this parameter allows base64 encoding for job IDs during sending test results, build logs, coverage and vulnerabilities data to ALM Octane.
+                <br/>
+                Default is false. Supported ALM Octane version 15.1.20 and above.</td>
+        </tr>
+        <tr>
+            <td>FORTIFY_SSC_TOKEN</td>
+            <td>authentication token</td>
+            <td>
+                Token for integration with Fortify Software Security Center (SSC).
+                See help information in  <a target="_blank" href="https://admhelp.microfocus.com/octane/en/latest/Online/Content/AdminGuide/how-setup-FoD-integration.htm">ALM Octane Help Center</a>.
+            </td>
+        </tr>
+        <tr>
+            <td>JOB_LIST_CACHE_ALLOWED</td>
+            <td>true/false</td>
+            <td>
+                Allow to cache the list of Jenkins jobs that is used to show available jobs when creating pipelines or test runners in ALM Octane. Use this option only if it takes more than 1 minute to show existing jobs.
+                <br/>
+                The cache is updated only if required by ALM Octane, and the previous cache was updated more than one hour ago. The cache is not updated when adding/removing/renaming jobs.
+                <br/>
+                For manual update of cache, call to the following URL: &lt;jenkins_url&gt;/nga/api/v1/clear-job-list-cache
+                <br/>
+                The cache cannot be used with the feature "Jenkins user for specific workspaces".
+                <br/>
+                Default is false.
+            </td>
+        </tr>
+        <tr>
+            <td>OCTANE_ROOTS_CACHE_ALLOWED</td>
+            <td>true/false</td>
+            <td>
+                Allow to cache the pipeline root from ALM Octane, to enable the plugin to send to ALM Octane relevant data only.
+                <br/>
+                Default is true.
+            </td>
+        </tr>
+        <tr>
+            <td>SCM_REST_API</td>
+            <td>true/false</td>
+            <td>The plugin uses a dedicated REST API in order to send data on SCM commits to ALM Octane. This parameter allows to use the events mechanism instead of REST API.
+                <br/>
+                Default is true (Rest API). Supported ALM Octane version 15.1.21 and above.</td>
+        </tr>
+        <tr>
+            <td>UFT_TEST_RUNNER_FOLDER</td>
+            <td>folder path</td>
+            <td>ALM Octane allows generation of discovery and execution jobs for UFT test runner. By default, those jobs are created in Jenkins root. This parameter allow to define the folder
+                in which those jobs will be created. <br/>For example : my_team_folder/uft</td>
+        </tr>
+        <tr>
+            <td>UFT_TEST_CONNECTION_DISABLED</td>
+            <td>true/false</td>
+            <td>Allow to disable "Test Connection" validation that is done during creation of UFT test runner. Default is false.</td>
+        </tr>
+
+        </tbody>
+    </table>
+</div>

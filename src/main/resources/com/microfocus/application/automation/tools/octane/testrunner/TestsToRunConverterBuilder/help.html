@@ -1,0 +1,176 @@
+<!--
+  ~ Certain versions of software and/or documents ("Material") accessible here may contain branding from
+  ~ Hewlett-Packard Company (now HP Inc.) and Hewlett Packard Enterprise Company.  As of September 1, 2017,
+  ~ the Material is now offered by Micro Focus, a separately owned and operated company.  Any reference to the HP
+  ~ and Hewlett Packard Enterprise/HPE marks is historical in nature, and the HP and Hewlett Packard Enterprise/HPE
+  ~ marks are the property of their respective owners.
+  ~ __________________________________________________________________
+  ~ MIT License
+  ~
+  ~ (c) Copyright 2012-2021 Micro Focus or one of its affiliates.
+  ~
+  ~ Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+  ~ documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+  ~ the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+  ~ and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+  ~
+  ~ The above copyright notice and this permission notice shall be included in all copies or
+  ~ substantial portions of the Software.
+  ~
+  ~ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+  ~ THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  ~ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+  ~ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  ~ SOFTWARE.
+  ~
+  ~ ___________________________________________________________________
+  -->
+
+<div>
+    This build step is intended to support execution of automated tests from Micro Focus ALM Octane.</br>
+    The builder searches for the "testsToRun" parameter which is sent from ALM Octane as part of the execution
+    framework.</br>
+    Once it is found, its value is converted to the format of the selected testing framework, and injected to the
+    "testsToRunConverted" environment parameter.</br>
+    Later, the new parameter can be used in the appropriate execution builder.
+    <ul>
+        <li> To use in parameter <i>textboxes</i>, use the following syntax: <b>${testsToRunConverted}</b></li>
+        <br/>
+        <li> To use in the <i>scripts</i>, use the following syntax:
+            <ul>
+                <li>Linux shell: $testsToRunConverted</li>
+                <li>Windows batch command: %testsToRunConverted%</li>
+                <li>Pipeline script (workflow job): "${params.testsToRunConverted}"</li>
+            </ul>
+
+            <br/>
+            See examples in the tables below:
+            <table border="1" width="100%" style="border-collapse: collapse;border: 1px solid black;">
+                <thead style="background-color: lightgray; font-weight: bold">
+                <tr>
+                    <td width="20%">Framework</td>
+                    <td>Linux shell</td>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td>Maven Surefire</td>
+                    <td>mvn clean -Dtest=$testsToRunConverted test</td>
+                </tr>
+                <tr>
+                    <td>Maven Failsafe</td>
+                    <td>mvn clean -Dit.test=$testsToRunConverted verify</td>
+                </tr>
+                <tr>
+                    <td>Gradle</td>
+                    <td>gradle test $testsToRunConverted</td>
+                </tr>
+                <tr>
+                    <td>Protractor</td>
+                    <td>protractor conf.js --grep="$testsToRunConverted"</td>
+                </tr>
+                <tr>
+                    <td>Cucumber-JVM over Maven</td>
+                    <td>mvn clean -Dcucumber.options="$testsToRunConverted" test</td>
+                </tr>
+                <tr>
+                    <td>JBehave over Maven</td>
+                    <td>mvn clean -Dfeatures="$testsToRunConverted" test</td>
+                </tr>
+                </tbody>
+            </table>
+            </br>
+            <table border="1" width="100%" style="border-collapse: collapse;border: 1px solid black;">
+                <thead style="background-color: lightgray; font-weight: bold">
+                <tr>
+                    <td width="20%">Framework</td>
+                    <td>Windows batch command</td>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td>Maven Surefire</td>
+                    <td>mvn clean -Dtest=%testsToRunConverted% test</td>
+                </tr>
+                <tr>
+                    <td>Maven Failsafe</td>
+                    <td>mvn clean -Dit.test=%testsToRunConverted% verify</td>
+                </tr>
+                <tr>
+                    <td>Gradle</td>
+                    <td>gradle test %testsToRunConverted%</td>
+                </tr>
+                <tr>
+                    <td>Protractor</td>
+                    <td>protractor conf.js --grep="%testsToRunConverted%"</td>
+                </tr>
+                <tr>
+                    <td>Cucumber-JVM over Maven</td>
+                    <td>mvn clean -Dcucumber.options="%testsToRunConverted%" test</td>
+                </tr>
+                <tr>
+                    <td>JBehave over Maven</td>
+                    <td>mvn clean -Dfeatures="%testsToRunConverted%" test</td>
+                </tr>
+                </tbody>
+            </table>
+            </br>
+            <table border="1" width="100%" style="border-collapse: collapse;border: 1px solid black;">
+                <thead style="background-color: lightgray; font-weight: bold">
+                <tr>
+                    <td width="20%">Framework</td>
+                    <td>Pipeline script</td>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td>Maven Surefire</td>
+                    <td>bat 'mvn clean -Dtest=${params.testsToRunConverted} test'</td>
+                </tr>
+                <tr>
+                    <td>Maven Failsafe</td>
+                    <td>bat 'mvn clean -Dit.test=${params.testsToRunConverted} verify'</td>
+                </tr>
+                <tr>
+                    <td>Gradle</td>
+                    <td>bat 'gradle test ${params.testsToRunConverted}'</td>
+                </tr>
+                <tr>
+                    <td>Protractor</td>
+                    <td>bat(/protractor conf.js --grep="${params.testsToRunConverted}"/)</td>
+                </tr>
+                <tr>
+                    <td>Cucumber-JVM over Maven</td>
+                    <td>bat(/mvn clean -Dcucumber.options="${params.testsToRunConverted}" test/)</td>
+                </tr>
+                <tr>
+                    <td>JBehave over Maven</td>
+                    <td>bat(/mvn clean -Dfeatures="${testsToRunConverted}" test/)</td>
+                </tr>
+                </tbody>
+            </table>
+            </br>
+        </li>
+    </ul>
+
+
+    </br>
+    Notes/Limitations :
+    </br>
+    <ul>
+        <li> <b>UFT</b>: In order to build a UFT MTBX file, this builder needs to know the test check-out directory. By
+            default this is the job workspace directory. If tests are checked out in another directory, define in the job a String parameter "testsToRunCheckoutDirectory"
+            with the correct directory.</li>
+        <li> <b>JUnit/TestNG</b>: Supported for JUnit 4.7+, Surefire Plugin 2.19+, Failsafe Plugin 2.12.1+.</li>
+        <li> <b>Cucumber-JVM over Maven</b>: If your project contains several run classes, specify a run class that will
+            be used, otherwise all run classes will be executed by Cucumber. You can specify test runner by adding:
+            '-Dtest=[runner class name]' to the Maven command
+        </li>
+        <li> <b>JBehave over Maven</b>: read more about integration with JBehave   <a target="_blank" href="https://github.com/MicroFocus/octane-jbehave-gherkin-reporter/blob/main/README.md">here</a>
+        </li>
+    </ul>
+
+    </br>
+    </br>
+    See more help information in  <a target="_blank" href="https://admhelp.microfocus.com/octane/en/latest/Online/Content/AdminGuide/how-setup-testing-integration.htm">ALM Octane Help Center</a>
+</div>

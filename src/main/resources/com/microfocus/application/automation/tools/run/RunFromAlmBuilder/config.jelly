@@ -1,0 +1,214 @@
+<!--
+  ~ Certain versions of software and/or documents ("Material") accessible here may contain branding from
+  ~ Hewlett-Packard Company (now HP Inc.) and Hewlett Packard Enterprise Company.  As of September 1, 2017,
+  ~ the Material is now offered by Micro Focus, a separately owned and operated company.  Any reference to the HP
+  ~ and Hewlett Packard Enterprise/HPE marks is historical in nature, and the HP and Hewlett Packard Enterprise/HPE
+  ~ marks are the property of their respective owners.
+  ~ __________________________________________________________________
+  ~ MIT License
+  ~
+  ~ (c) Copyright 2012-2021 Micro Focus or one of its affiliates.
+  ~
+  ~ Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+  ~ documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+  ~ the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+  ~ and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+  ~
+  ~ The above copyright notice and this permission notice shall be included in all copies or
+  ~ substantial portions of the Software.
+  ~
+  ~ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+  ~ THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  ~ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+  ~ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  ~ SOFTWARE.
+  ~
+  ~ ___________________________________________________________________
+  -->
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+
+    <script type="text/javascript" src="https://code.jquery.com/jquery-3.5.0.js"></script>
+    <script type="text/javascript" src="${rootURL}/plugin/hp-application-automation-tools-plugin/js/almUtils.js"/>
+
+    <style>
+        #testName {
+            width: 300px;
+            margin-bottom: 10px;
+        }
+
+        table tr td div.help {
+            margin-left: 12px;
+            background: none;
+            border: none;
+        }
+
+        input[name="runfromAlm.isFilterTestsEnabled"]{
+            margin-left: 35px;
+        }
+
+        .help {
+            border: none;
+            background: none !important;
+            background-color: transparent;
+        }
+
+        table td .help {
+            background: none;
+        }
+
+        table tr[nameref^="rowSetStart"] {
+            background: none;
+        }
+
+        table tr[nameref^="cb20"] {
+           background-color: transparent;
+        }
+
+        textarea.setting-input{
+            resize: vertical;
+        }
+
+        [name="runfromalm.isSSOEnabled"] {
+            position: relative;
+            top: 1px !important;
+        }
+
+        [name="runfromAlm.isFilterTestsEnabled"] {
+            position: relative;
+            top: 2px;
+        }
+
+        [name="runfromalm.almClientID"] {
+             margin-bottom: 10px;
+        }
+        [name="runfromalm.almApiKey"] {
+             margin-bottom: 10px;
+        }
+        [name="runfromalm.almUserName"] {
+             margin-bottom: 10px;
+        }
+
+        .info {
+            margin-left: -15px;
+        }
+    </style>
+
+    <!--
+      ~ [JENKINS-64639]: This table is only for drawing information. Also, the tr and td are removed by Jenkins core and the generated HTML doesn't contain it.
+      -->
+	<j:if test="${empty(descriptor.almServers)}">
+        <tr>
+          <td/>
+          <td colspan="2">
+            <div class="help" style="display:block; margin-left: -10px;">
+              ${%AlmServersAreNotDefined}
+            </div>
+          </td>
+          <td/>
+        </tr>
+	</j:if>
+
+    <tr>
+      <td/>
+      <td colspan="2">
+        <div class="help" style="display:block; margin-left: -10px;">
+          ${%DontForgetThePublisher}
+        </div>
+      </td>
+      <td/>
+    </tr>
+
+    <tr>
+        <td/>
+        <td colspan="2">
+            <div class="help" style="display:block; margin-left: -10px;">
+                The credentials for <b>"Run from ALM"</b> tasks have been moved to <b>Jenkins Configure System</b> page. In order to update them please create a new project, add as a
+                <b>"Post build action"</b> in the configuration page the action called <b>"Migrate ALM Credentials"</b> and run the job.
+                In case migration process was accomplished, please add/edit credentials in global configuration page.
+            </div>
+        </td>
+        <td/>
+    </tr>
+
+
+        <f:entry field="almServerName">
+          <label>ALM server</label>
+          <f:select clazz="servers"/>
+        </f:entry>
+
+        <f:entry field="isSSOEnabled">
+            <f:checkbox id="ssoCheckbox" title="SSO enabled" name="runfromalm.isSSOEnabled" checked="${instance.runFromAlmModel.isSSOEnabled}"
+                    value="${instance.runFromAlmModel.isSSOEnabled}"/>
+        </f:entry>
+
+         <f:entry field="almUserName">
+              <div class="noSSOCredentials">
+                <label>ALM username</label>
+                <f:select clazz="usernameList" />
+              </div>
+         </f:entry>
+
+        <f:entry field="almClientID">
+             <div class="ssoCredentials">
+                <label>ALM Client ID</label>
+                <f:select clazz="clientIDList" />
+             </div>
+        </f:entry>
+
+        <f:entry>
+            <label>Domain</label>
+            <f:entry field="almDomain">
+                <f:textbox name="runfromalm.almDomain" value="${instance.runFromAlmModel.almDomain}" />
+            </f:entry>
+        </f:entry>
+
+        <f:entry>
+            <label>Project</label>
+            <f:entry field="almProject">
+                <f:textbox name="runfromalm.almProject" value="${instance.runFromAlmModel.almProject}"/>
+            </f:entry>
+        </f:entry>
+
+        <f:entry>
+            <label>Test sets</label>
+            <f:entry field="almTestSets">
+                <f:expandableTextbox name="runfromalm.almTestSets" value="${instance.runFromAlmModel.almTestSets}"/>
+            </f:entry>
+        </f:entry>
+
+        <f:entry>
+            <label>Timeout</label>
+            <f:entry field="almTimeout">
+                <f:textbox name="runfromalm.almTimeout" value="${instance.runFromAlmModel.almTimeout}"/>
+            </f:entry>
+        </f:entry>
+
+        <f:optionalBlock title="Filter ALM test sets" name="runfromAlm.isFilterTestsEnabled" field="isFilterTestsEnabled" inline="true">
+            <f:entry field="filterTestsModel">
+                <f:property field="filterTestsModel" />
+            </f:entry>
+        </f:optionalBlock>
+
+        <f:advanced>
+            <f:entry>
+                <label>Run mode</label>
+                <f:entry field="almRunMode">
+                    <select name="runfromalm.almRunMode" >
+                        <j:forEach var="runMode" items="${descriptor.almRunModes}">
+                            <f:option selected="${runMode.value == instance.runFromAlmModel.almRunMode}" value="${runMode.value}">
+                              ${runMode.description}
+                            </f:option>
+                        </j:forEach>
+                    </select>
+                </f:entry>
+            </f:entry>
+
+            <f:entry>
+                <label>Testing Tool host</label>
+                <f:entry field="almRunHost">
+                    <f:textbox name="runfromalm.almRunHost" value="${instance.runFromAlmModel.almRunHost}"/>
+                </f:entry>
+            </f:entry>
+        </f:advanced>      
+</j:jelly>

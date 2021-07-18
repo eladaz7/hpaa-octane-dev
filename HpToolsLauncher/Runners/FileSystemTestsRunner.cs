@@ -1,7 +1,30 @@
-// (c) Copyright 2012 Hewlett-Packard Development Company, L.P. 
-// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+/*
+ * Certain versions of software and/or documents ("Material") accessible here may contain branding from
+ * Hewlett-Packard Company (now HP Inc.) and Hewlett Packard Enterprise Company.  As of September 1, 2017,
+ * the Material is now offered by Micro Focus, a separately owned and operated company.  Any reference to the HP
+ * and Hewlett Packard Enterprise/HPE marks is historical in nature, and the HP and Hewlett Packard Enterprise/HPE
+ * marks are the property of their respective owners.
+ * __________________________________________________________________
+ * MIT License
+ *
+ * (c) Copyright 2012-2021 Micro Focus or one of its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+ * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+ * and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all copies or
+ * substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+ * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ * ___________________________________________________________________
+ */
 
 using System;
 using System.Collections.Generic;
@@ -10,6 +33,8 @@ using System.IO;
 using System.Reflection;
 using HpToolsLauncher.Properties;
 using HpToolsLauncher.TestRunners;
+using HpToolsLauncher.RTS;
+
 
 namespace HpToolsLauncher
 {
@@ -22,7 +47,12 @@ namespace HpToolsLauncher
         private static string _uftViewerPath;
         private int _errors, _fail;
         private bool _useUFTLicense;
+        private bool _displayController;
+        private string _analysisTemplate;
+        private SummaryDataLogger _summaryDataLogger;
+        private List<ScriptRTSModel> _scriptRTSSet;
         private TimeSpan _timeout = TimeSpan.MaxValue;
+        private readonly string _uftRunMode;
         private Stopwatch _stopwatch = null;
         private string _abortFilename = System.IO.Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) + "\\stop" + Launcher.UniqueTimeStamp + ".txt";
 
@@ -31,35 +61,93 @@ namespace HpToolsLauncher
         private TimeSpan _perScenarioTimeOutMinutes;
         private List<string> _ignoreErrorStrings;
 
+        // parallel runner related information
+        private Dictionary<string, List<string>> _parallelRunnerEnvironments;
 
         //saves runners for cleaning up at the end.
         private Dictionary<TestType, IFileSysTestRunner> _colRunnersForCleanup = new Dictionary<TestType, IFileSysTestRunner>();
 
 
-        public const string UftJUnitRportName = "uftRunnerRoot";
-
         private McConnectionInfo _mcConnection;
         private string _mobileInfoForAllGuiTests;
 
+
         #endregion
+
+        /// <summary>
+        /// overloaded constructor for adding support for run mode selection
+        /// </summary>
+        /// <param name="sources"></param>
+        /// <param name="timeout"></param>
+        /// <param name="uftRunMode"></param>
+        /// <param name="reportPath"></param>
+        /// <param name="useUftLicense"></param>
+        /// <param name="controllerPollingInterval"></param>
+        /// <param name="perScenarioTimeOutMinutes"></param>
+        /// <param name="ignoreErrorStrings"></param>
+        /// <param name="jenkinsEnvVariables"></param>
+        /// <param name="mcConnection"></param>
+        /// <param name="mobileInfo"></param>
+        /// <param name="parallelRunnerEnvironments"></param>
+        /// <param name="displayController"></param>
+        /// <param name="analysisTemplate"></param>
+        /// <param name="summaryDataLogger"></param>
+        /// <param name="scriptRtsSet"></param>
+        public FileSystemTestsRunner(List<TestData> sources,
+                                    TimeSpan timeout,
+                                    string uftRunMode,
+                                    int controllerPollingInterval,
+                                    TimeSpan perScenarioTimeOutMinutes,
+                                    List<string> ignoreErrorStrings,
+                                    Dictionary<string, string> jenkinsEnvVariables,
+                                    McConnectionInfo mcConnection,
+                                    string mobileInfo,
+                                    Dictionary<string, List<string>> parallelRunnerEnvironments,
+                                    bool displayController,
+                                    string analysisTemplate,
+                                    SummaryDataLogger summaryDataLogger,
+                                    List<ScriptRTSModel> scriptRtsSet,
+                                    string reportPath,
+                                    bool useUftLicense = false)
+
+            : this(sources, timeout, controllerPollingInterval, perScenarioTimeOutMinutes, ignoreErrorStrings, jenkinsEnvVariables, mcConnection, mobileInfo, parallelRunnerEnvironments, displayController, analysisTemplate, summaryDataLogger, scriptRtsSet, reportPath, useUftLicense)
+        {
+            _uftRunMode = uftRunMode;
+        }
 
         /// <summary>
         /// creates instance of the runner given a source.
         /// </summary>
         /// <param name="sources"></param>
         /// <param name="timeout"></param>
-        /// <param name="backgroundWorker"></param>
-        /// <param name="useUFTLicense"></param>
-        public FileSystemTestsRunner(List<string> sources,
-            TimeSpan timeout,
-            int ControllerPollingInterval,
-            TimeSpan perScenarioTimeOutMinutes,
-            List<string> ignoreErrorStrings,
-            Dictionary<string, string> jenkinsEnvVariables,
-            McConnectionInfo mcConnection,
-            string mobileInfo,
-            bool useUFTLicense = false     
-            )
+        /// <param name="scriptRtsSet"></param>
+        /// <param name="reportPath"></param>
+        /// <param name="controllerPollingInterval"></param>
+        /// <param name="perScenarioTimeOutMinutes"></param>
+        /// <param name="ignoreErrorStrings"></param>
+        /// <param name="jenkinsEnvVariables"></param>
+        /// <param name="mcConnection"></param>
+        /// <param name="mobileInfo"></param>
+        /// <param name="parallelRunnerEnvironments"></param>
+        /// <param name="displayController"></param>
+        /// <param name="analysisTemplate"></param>
+        /// <param name="summaryDataLogger"></param>
+        /// <param name="useUftLicense"></param>
+        public FileSystemTestsRunner(List<TestData> sources,
+                                    TimeSpan timeout,
+                                    int controllerPollingInterval,
+                                    TimeSpan perScenarioTimeOutMinutes,
+                                    List<string> ignoreErrorStrings,
+                                    Dictionary<string, string> jenkinsEnvVariables,
+                                    McConnectionInfo mcConnection,
+                                    string mobileInfo,
+                                    Dictionary<string, List<string>> parallelRunnerEnvironments,
+                                    bool displayController,
+                                    string analysisTemplate,
+                                    SummaryDataLogger summaryDataLogger,
+                                    List<ScriptRTSModel> scriptRtsSet,
+                                    string reportPath,
+                                    bool useUftLicense = false)
         {
             _jenkinsEnvVariables = jenkinsEnvVariables;
             //search if we have any testing tools installed
@@ -70,36 +158,46 @@ namespace HpToolsLauncher
             }
 
             _timeout = timeout;
-            ConsoleWriter.WriteLine("FileSystemTestRunner timeout is " + _timeout );
+            ConsoleWriter.WriteLine("FileSystemTestRunner timeout is " + _timeout);
             _stopwatch = Stopwatch.StartNew();
 
-            _pollingInterval = ControllerPollingInterval;
+            _pollingInterval = controllerPollingInterval;
             _perScenarioTimeOutMinutes = perScenarioTimeOutMinutes;
             _ignoreErrorStrings = ignoreErrorStrings;
 
-
-            _useUFTLicense = useUFTLicense;
+            _useUFTLicense = useUftLicense;
+            _displayController = displayController;
+            _analysisTemplate = analysisTemplate;
+            _summaryDataLogger = summaryDataLogger;
+            _scriptRTSSet = scriptRtsSet;
             _tests = new List<TestInfo>();
 
             _mcConnection = mcConnection;
             _mobileInfoForAllGuiTests = mobileInfo;
 
-            ConsoleWriter.WriteLine("Mc connection info is - " + _mcConnection.ToString());
+            _parallelRunnerEnvironments = parallelRunnerEnvironments;
+
+            ConsoleWriter.WriteLine("UFT Mobile connection info is - " + _mcConnection.ToString());
+
+            if (reportPath != null)
+            {
+                ConsoleWriter.WriteLine("Results directory is: " + reportPath);
+            }
 
             //go over all sources, and create a list of all tests
-            foreach (string source in sources)
+            foreach (TestData source in sources)
             {
                 List<TestInfo> testGroup = new List<TestInfo>();
                 try
                 {
                     //--handle directories which contain test subdirectories (recursively)
-                    if (Helper.IsDirectory(source))
+                    if (Helper.IsDirectory(source.Tests))
                     {
 
-                        var testsLocations = Helper.GetTestsLocations(source);
+                        var testsLocations = Helper.GetTestsLocations(source.Tests);
                         foreach (var loc in testsLocations)
                         {
-                            var test = new TestInfo(loc, loc, source);
+                            var test = new TestInfo(loc, loc, source.Tests, source.Id);
                             testGroup.Add(test);
                         }
                     }
@@ -110,23 +208,29 @@ namespace HpToolsLauncher
                     //other files are dropped
                     {
                         testGroup = new List<TestInfo>();
-                        FileInfo fi = new FileInfo(source);
+                        FileInfo fi = new FileInfo(source.Tests);
                         if (fi.Extension == Helper.LoadRunnerFileExtention)
-                            testGroup.Add(new TestInfo(source, source, source));
+                            testGroup.Add(new TestInfo(source.Tests, source.Tests, source.Tests, source.Id));
                         else if (fi.Extension == ".mtb")
                         //if (source.TrimEnd().EndsWith(".mtb", StringComparison.CurrentCultureIgnoreCase))
                         {
                             MtbManager manager = new MtbManager();
-                            var paths = manager.Parse(source);
+                            var paths = manager.Parse(source.Tests);
                             foreach (var p in paths)
                             {
-                                testGroup.Add(new TestInfo(p, p, source));
+                                testGroup.Add(new TestInfo(p, p, source.Tests, source.Id));
                             }
                         }
                         else if (fi.Extension == ".mtbx")
-                        //if (source.TrimEnd().EndsWith(".mtb", StringComparison.CurrentCultureIgnoreCase))
                         {
-                            testGroup = MtbxManager.Parse(source, _jenkinsEnvVariables, source);
+                            testGroup = MtbxManager.Parse(source.Tests, _jenkinsEnvVariables, source.Tests);
+
+                            // set the test Id for each test from the group
+                            // this is important for parallel runner
+                            foreach (var testInfo in testGroup)
+                            {
+                                testInfo.TestId = source.Id;
+                            }
                         }
                     }
                 }
@@ -138,7 +242,7 @@ namespace HpToolsLauncher
                 //--handle single test dir, add it with no group
                 if (testGroup.Count == 1)
                 {
-                    testGroup[0].TestGroup = "<None>";
+                    testGroup[0].TestGroup = "Test group";
                 }
 
                 _tests.AddRange(testGroup);
@@ -150,16 +254,29 @@ namespace HpToolsLauncher
                 Environment.Exit((int)Launcher.ExitCodeEnum.Failed);
             }
 
+            // if a custom path was provided,set the custom report path for all the valid tests(this will overwrite the default location)
+            if (reportPath != null)
+            {
+                _tests.ForEach(test => test.ReportPath = reportPath);
+            }
+
             ConsoleWriter.WriteLine(string.Format(Resources.FsRunnerTestsFound, _tests.Count));
-            _tests.ForEach(t => ConsoleWriter.WriteLine("" + t.TestName));
+
+            foreach (var test in _tests)
+            {
+                ConsoleWriter.WriteLine("" + test.TestName);
+                if (parallelRunnerEnvironments.ContainsKey(test.TestId))
+                {
+                    parallelRunnerEnvironments[test.TestId].ForEach(
+                        env => ConsoleWriter.WriteLine("    " + env));
+                }
+            }
+
             ConsoleWriter.WriteLine(Resources.GeneralDoubleSeperator);
         }
 
-
-
-
         /// <summary>
-        /// runs all tests given to this runner and returns a suite of run resutls
+        /// runs all tests given to this runner and returns a suite of run results
         /// </summary>
         /// <returns>The rest run results for each test</returns>
         public override TestSuiteRunResults Run()
@@ -171,8 +288,22 @@ namespace HpToolsLauncher
             try
             {
                 var start = DateTime.Now;
+
+                Dictionary<string, int> indexList = new Dictionary<string, int>();
                 foreach (var test in _tests)
                 {
+                    indexList[test.TestPath] = 0;
+                }
+
+                Dictionary<string, int> rerunList = createDictionary(_tests);
+
+                foreach (var test in _tests)
+                {
+                    if (indexList[test.TestPath] == 0)
+                    {
+                        indexList[test.TestPath] = 1;
+                    }
+
                     if (RunCancelled()) break;
 
                     var testStart = DateTime.Now;
@@ -181,14 +312,17 @@ namespace HpToolsLauncher
                     TestRunResults runResult = null;
                     try
                     {
-                        runResult = RunHPToolsTest(test, ref errorReason);
+                        runResult = RunHpToolsTest(test, ref errorReason);
                     }
                     catch (Exception ex)
                     {
-                        runResult = new TestRunResults();
-                        runResult.TestState = TestState.Error;
-                        runResult.ErrorDesc = ex.Message;
-                        runResult.TestName = test.TestName;
+                        runResult = new TestRunResults
+                        {
+                            TestState = TestState.Error,
+                            ErrorDesc = ex.Message,
+                            TestName = test.TestName,
+                            TestPath = test.TestPath
+                        };
                     }
 
                     //get the original source for this test, for grouping tests under test classes
@@ -207,14 +341,7 @@ namespace HpToolsLauncher
                         {
                             if (string.IsNullOrEmpty(runResult.ErrorDesc))
                             {
-                                if (RunCancelled())
-                                {
-                                    runResult.ErrorDesc = HpToolsLauncher.Properties.Resources.ExceptionUserCancelled;
-                                }
-                                else
-                                {
-                                    runResult.ErrorDesc = HpToolsLauncher.Properties.Resources.ExceptionExternalProcess;
-                                }
+                                runResult.ErrorDesc = RunCancelled() ? HpToolsLauncher.Properties.Resources.ExceptionUserCancelled : HpToolsLauncher.Properties.Resources.ExceptionExternalProcess;
                             }
                             runResult.ReportLocation = null;
                             runResult.TestState = TestState.Error;
@@ -231,11 +358,48 @@ namespace HpToolsLauncher
                         ConsoleWriter.WriteLine(string.Format(Resources.FsRunnerTestDone, runResult.TestState));
                     }
 
-                    ConsoleWriter.WriteLine(DateTime.Now.ToString(Launcher.DateFormat) + " Test complete: " + runResult.TestPath + "\n-------------------------------------------------------------------------------------------------------");
-
                     UpdateCounters(runResult.TestState);
                     var testTotalTime = (DateTime.Now - testStart).TotalSeconds;
+
+                    //create test folders
+                    if (rerunList[test.TestPath] > 0)
+                    {
+                        if (!Directory.Exists(Path.Combine(test.TestPath, "Report1")))
+                        {
+                            rerunList[test.TestPath]--;
+                        }
+                        else
+                        {
+                            indexList[test.TestPath]++;
+                            rerunList[test.TestPath]--;
+                        }
+                    }
+
+                    //update report folder
+                    String uftReportDir = Path.Combine(test.TestPath, "Report");
+                    String uftReportDirNew = Path.Combine(test.TestPath, "Report" + indexList[test.TestPath]);
+                    ConsoleWriter.WriteLine("uftReportDir is " + uftReportDirNew);
+                    try
+                    {
+                        if (Directory.Exists(uftReportDir))
+                        {
+                            if (Directory.Exists(uftReportDirNew))
+                            {
+                                Helper.DeleteDirectory(uftReportDirNew);
+                            }
+
+                            Directory.Move(uftReportDir, uftReportDirNew);
+                        }
+                    }
+                    catch(Exception e)
+                    {
+                        System.Threading.Thread.Sleep(1000);
+                        Directory.Move(uftReportDir, uftReportDirNew);
+                    }
+
+                    ConsoleWriter.WriteLine(DateTime.Now.ToString(Launcher.DateFormat) + " Test complete: " + runResult.TestPath + "\n-------------------------------------------------------------------------------------------------------");
                 }
+
                 totalTime = (DateTime.Now - start).TotalSeconds;
             }
             finally
@@ -254,27 +418,62 @@ namespace HpToolsLauncher
             return activeRunDesc;
         }
 
+
+        private Dictionary<string, int> createDictionary(List<TestInfo> validTests)
+        {
+            var rerunList = new Dictionary<string, int>();
+            foreach (var item in validTests)
+            {
+                if (!rerunList.ContainsKey(item.TestPath))
+                {
+                    rerunList.Add(item.TestPath, 1);
+                }
+                else
+                {
+                    rerunList[item.TestPath]++;
+                }
+            }
+
+            return rerunList;
+        }
+
         /// <summary>
         /// checks if timeout has expired
         /// </summary>
         /// <returns></returns>
         private bool CheckTimeout()
         {
-            TimeSpan timeleft = _timeout - _stopwatch.Elapsed;
-            return (timeleft > TimeSpan.Zero);
+            TimeSpan timeLeft = _timeout - _stopwatch.Elapsed;
+            return (timeLeft > TimeSpan.Zero);
         }
 
         /// <summary>
         /// creates a correct type of runner and runs a single test.
         /// </summary>
-        /// <param name="testPath"></param>
+        /// <param name="testInfo"></param>
         /// <param name="errorReason"></param>
         /// <returns></returns>
-        private TestRunResults RunHPToolsTest(TestInfo testinf, ref string errorReason)
+        private TestRunResults RunHpToolsTest(TestInfo testInfo, ref string errorReason)
         {
+            var testPath = testInfo.TestPath;
 
-            var testPath = testinf.TestPath;
             var type = Helper.GetTestType(testPath);
+
+            // if we have at least one environment for parallel runner,
+            // then it must be enabled
+            var isParallelRunnerEnabled = _parallelRunnerEnvironments.Count > 0;
+
+            if (isParallelRunnerEnabled && type == TestType.QTP)
+            {
+                type = TestType.ParallelRunner;
+            }
+            // if the current test is an api test ignore the parallel runner flag
+            // and just continue as usual
+            else if (isParallelRunnerEnabled && type == TestType.ST)
+            {
+                ConsoleWriter.WriteLine("ParallelRunner does not support API tests, treating as normal test.");
+            }
+
             IFileSysTestRunner runner = null;
             switch (type)
             {
@@ -282,14 +481,16 @@ namespace HpToolsLauncher
                     runner = new ApiTestRunner(this, _timeout - _stopwatch.Elapsed);
                     break;
                 case TestType.QTP:
-                    runner = new GuiTestRunner(this, _useUFTLicense, _timeout - _stopwatch.Elapsed, _mcConnection, _mobileInfoForAllGuiTests);
+                    runner = new GuiTestRunner(this, _useUFTLicense, _timeout - _stopwatch.Elapsed, _uftRunMode, _mcConnection, _mobileInfoForAllGuiTests);
                     break;
                 case TestType.LoadRunner:
                     AppDomain.CurrentDomain.AssemblyResolve += Helper.HPToolsAssemblyResolver;
-                    runner = new PerformanceTestRunner(this, _timeout, _pollingInterval, _perScenarioTimeOutMinutes, _ignoreErrorStrings);
+                    runner = new PerformanceTestRunner(this, _timeout, _pollingInterval, _perScenarioTimeOutMinutes, _ignoreErrorStrings, _displayController, _analysisTemplate, _summaryDataLogger, _scriptRTSSet);
+                    break;
+                case TestType.ParallelRunner:
+                    runner = new ParallelTestRunner(this, _timeout - _stopwatch.Elapsed, _mcConnection, _mobileInfoForAllGuiTests, _parallelRunnerEnvironments);
                     break;
             }
-
 
             if (runner != null)
             {
@@ -298,7 +499,11 @@ namespace HpToolsLauncher
 
                 Stopwatch s = Stopwatch.StartNew();
 
-                var results = runner.RunTest(testinf, ref errorReason, RunCancelled);
+                var results = runner.RunTest(testInfo, ref errorReason, RunCancelled);
+                if (results.ErrorDesc != null && results.ErrorDesc.Equals(TestState.Error))
+                {
+                    Environment.Exit((int)Launcher.ExitCodeEnum.Failed);
+                }
 
                 results.Runtime = s.Elapsed;
                 if (type == TestType.LoadRunner)
@@ -330,7 +535,9 @@ namespace HpToolsLauncher
             //if timeout has passed
             if (_stopwatch.Elapsed > _timeout && !_blnRunCancelled)
             {
+                ConsoleWriter.WriteLine(Resources.SmallDoubleSeparator);
                 ConsoleWriter.WriteLine(Resources.GeneralTimedOut);
+                ConsoleWriter.WriteLine(Resources.SmallDoubleSeparator);
 
                 Launcher.ExitCode = Launcher.ExitCodeEnum.Aborted;
                 _blnRunCancelled = true;

@@ -1,24 +1,45 @@
-// (c) Copyright 2012 Hewlett-Packard Development Company, L.P. 
-// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+/*
+ * Certain versions of software and/or documents ("Material") accessible here may contain branding from
+ * Hewlett-Packard Company (now HP Inc.) and Hewlett Packard Enterprise Company.  As of September 1, 2017,
+ * the Material is now offered by Micro Focus, a separately owned and operated company.  Any reference to the HP
+ * and Hewlett Packard Enterprise/HPE marks is historical in nature, and the HP and Hewlett Packard Enterprise/HPE
+ * marks are the property of their respective owners.
+ * __________________________________________________________________
+ * MIT License
+ *
+ * (c) Copyright 2012-2021 Micro Focus or one of its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+ * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+ * and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all copies or
+ * substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+ * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ * ___________________________________________________________________
+ */
 
+using HpToolsLauncher.Properties;
+using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Text;
-using System.Timers;
 using System.Web.UI;
 using System.Xml;
 using System.Xml.Linq;
 using System.Xml.XPath;
 using System.Xml.Xsl;
-using HpToolsLauncher.Properties;
-using Microsoft.Win32;
 
 namespace HpToolsLauncher
 {
@@ -27,6 +48,7 @@ namespace HpToolsLauncher
         QTP,
         ST,
         LoadRunner,
+        ParallelRunner
     }
 
     public enum TestState
@@ -76,7 +98,7 @@ namespace HpToolsLauncher
         public const string LoadRunnerControllerDirRegistryValue = @"\Controller";
 
         public static readonly System.Collections.ObjectModel.ReadOnlyCollection<string> LoadRunnerENVVariables =
-            new System.Collections.ObjectModel.ReadOnlyCollection<string>(new[] {"LG_PATH", "LR_PATH"});
+            new System.Collections.ObjectModel.ReadOnlyCollection<string>(new[] { "LG_PATH", "LR_PATH" });
 
 
         public const string InstalltionFolderValue = "LOCAL_MLROOT";
@@ -113,7 +135,7 @@ namespace HpToolsLauncher
             {
                 ConsoleWriter.WriteErrLine(string.Format(Resources.LoadRunnerNotInstalled,
                     System.Environment.MachineName));
-                Environment.Exit((int) Launcher.ExitCodeEnum.Aborted);
+                Environment.Exit((int)Launcher.ExitCodeEnum.Aborted);
             }
 
             installtionPath = Path.Combine(installtionPath, "bin");
@@ -123,7 +145,7 @@ namespace HpToolsLauncher
             {
                 //resource!
                 ConsoleWriter.WriteErrLine("cannot locate " + assemblyName + ".dll in installation directory");
-                Environment.Exit((int) Launcher.ExitCodeEnum.Aborted);
+                Environment.Exit((int)Launcher.ExitCodeEnum.Aborted);
             }
             else
             {
@@ -142,7 +164,7 @@ namespace HpToolsLauncher
                     {
                         ConsoleWriter.WriteErrLine(string.Format(Resources.HPToolsAssemblyResolverWrongVersion,
                             Environment.MachineName));
-                        Environment.Exit((int) Launcher.ExitCodeEnum.Aborted);
+                        Environment.Exit((int)Launcher.ExitCodeEnum.Aborted);
                     }
                 }
                 else
@@ -160,17 +182,17 @@ namespace HpToolsLauncher
 
         public static string GetRootDirectoryPath()
         {
-            String directoryPath;
+            string directoryPath;
             RegistryKey regkey = Registry.LocalMachine.OpenSubKey(FT_REG_ROOT);
 
             if (regkey != null)
-                directoryPath = (string) regkey.GetValue(FT_ROOT_PATH_KEY);
+                directoryPath = (string)regkey.GetValue(FT_ROOT_PATH_KEY);
             else
             {
-//TRY 64 bit REG path
+                //TRY 64 bit REG path
                 regkey = Registry.LocalMachine.OpenSubKey(FT_REG_ROOT_64_BIT);
                 if (regkey != null)
-                    directoryPath = (string) regkey.GetValue(FT_ROOT_PATH_KEY);
+                    directoryPath = (string)regkey.GetValue(FT_ROOT_PATH_KEY);
                 else
                     directoryPath = GetRootFromEnvironment();
             }
@@ -178,16 +200,17 @@ namespace HpToolsLauncher
             return directoryPath;
         }
 
-
-        //verify that files/fodlers exist (does not recurse into folders)
-        public static List<string> ValidateFiles(IEnumerable<string> tests)
+        //verify that files/folders exist (does not recurse into folders)
+        public static List<TestData> ValidateFiles(IEnumerable<TestData> tests)
         {
-            List<string> validTests = new List<string>();
-            foreach (string test in tests)
+            //Console.WriteLine("[ValidateFiles]");
+            List<TestData> validTests = new List<TestData>();
+            foreach (TestData test in tests)
             {
-                if (!File.Exists(test) && !Directory.Exists(test))
+                //Console.WriteLine("ValidateFiles, test Id: " + test.Id +  ", test path " + test.Tests);
+                if (!File.Exists(test.Tests) && !Directory.Exists(test.Tests))
                 {
-                    ConsoleWriter.WriteLine(string.Format(">>>> File/Folder not found: '{0}'", test));
+                    ConsoleWriter.WriteLine(string.Format(">>>> File/Folder not found: '{0}'", test.Tests));
                     Launcher.ExitCode = Launcher.ExitCodeEnum.Failed;
                 }
                 else
@@ -196,6 +219,19 @@ namespace HpToolsLauncher
                 }
             }
             return validTests;
+        }
+
+        public static bool FileExists(string filePath)
+        {
+            bool isFileValid = true;
+            if (!File.Exists(filePath))
+            {
+                ConsoleWriter.WriteLine(string.Format(">>>> File not found: '{0}'", filePath));
+                isFileValid = false;
+                Launcher.ExitCode = Launcher.ExitCodeEnum.Failed;
+            }
+
+            return isFileValid;
         }
 
         public static bool IsTestingToolsInstalled(TestStorageType type)
@@ -247,7 +283,7 @@ namespace HpToolsLauncher
 
             if (regkey != null)
             {
-                value = (string) regkey.GetValue(FT_ROOT_PATH_KEY);
+                value = (string)regkey.GetValue(FT_ROOT_PATH_KEY);
                 if (!string.IsNullOrEmpty(value))
                 {
                     return true;
@@ -269,7 +305,7 @@ namespace HpToolsLauncher
 
             if (regkey != null)
             {
-                value = (string) regkey.GetValue(InstalltionFolderValue);
+                value = (string)regkey.GetValue(InstalltionFolderValue);
                 if (!string.IsNullOrEmpty(value))
                 {
                     return true;
@@ -400,7 +436,7 @@ namespace HpToolsLauncher
 
             if ((File.GetAttributes(path) & FileAttributes.Directory) == FileAttributes.Directory)
             {
-//ST and QTP uses folder as test locations
+                //ST and QTP uses folder as test locations
                 var stFiles = Directory.GetFiles(path,
                     @"*.st?",
                     SearchOption.TopDirectoryOnly);
@@ -409,7 +445,7 @@ namespace HpToolsLauncher
             }
             else //not directory
             {
-//loadrunner is a path to file...
+                //loadrunner is a path to file...
                 return TestType.LoadRunner;
             }
         }
@@ -425,10 +461,10 @@ namespace HpToolsLauncher
             return isDirectory;
         }
 
-        static void WalkDirectoryTree(System.IO.DirectoryInfo root, ref List<string> results)
+        static void WalkDirectoryTree(DirectoryInfo root, ref List<string> results)
         {
-            System.IO.FileInfo[] files = null;
-            System.IO.DirectoryInfo[] subDirs = null;
+            FileInfo[] files = null;
+            DirectoryInfo[] subDirs;
 
             // First, process all the files directly under this folder
             try
@@ -438,7 +474,7 @@ namespace HpToolsLauncher
                 files = files.Union(root.GetFiles("*" + QTPFileExtention)).ToArray();
                 files = files.Union(root.GetFiles("*" + LoadRunnerFileExtention)).ToArray();
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 // This code just writes out the message and continues to recurse.
                 // You may decide to do something different here. For example, you
@@ -448,7 +484,7 @@ namespace HpToolsLauncher
 
             if (files != null)
             {
-                foreach (System.IO.FileInfo fi in files)
+                foreach (FileInfo fi in files)
                 {
                     if (fi.Extension == LoadRunnerFileExtention)
                         results.Add(fi.FullName);
@@ -464,7 +500,7 @@ namespace HpToolsLauncher
                 // Now find all the subdirectories under this directory.
                 subDirs = root.GetDirectories();
 
-                foreach (System.IO.DirectoryInfo dirInfo in subDirs)
+                foreach (DirectoryInfo dirInfo in subDirs)
                 {
                     // Recursive call for each subdirectory.
                     WalkDirectoryTree(dirInfo, ref results);
@@ -491,7 +527,7 @@ namespace HpToolsLauncher
             return tempDirPath;
         }
 
-        public static bool IsNetworkPath(String path)
+        public static bool IsNetworkPath(string path)
         {
             if (path.StartsWith(@"\\"))
                 return true;
@@ -504,7 +540,7 @@ namespace HpToolsLauncher
         {
             bool bRet = false;
             Process[] procArray = Process.GetProcessesByName("LFTRuntime");
-                // Hardcoded temporarily since LeanFT does not store the process name anywhere
+            // Hardcoded temporarily since LeanFT does not store the process name anywhere
             if (procArray.Length != 0)
             {
                 bRet = true;
@@ -551,7 +587,135 @@ namespace HpToolsLauncher
             return true;
         }
 
+        public static string GetParallelRunnerDirectory(string parallelRunnerExecutable)
+        {
+            if (parallelRunnerExecutable == null) return null;
+
+            var uftFolder = GetSTInstallPath();
+
+            if (uftFolder == null) return null;
+
+            return uftFolder + @"bin\" + parallelRunnerExecutable;
+        }
+
+        public static void ChangeDCOMSettingToInteractiveUser()
+        {
+            string errorMsg = "Unable to change DCOM settings. To chage it manually: " +
+                  "run dcomcnfg.exe -> My Computer -> DCOM Config -> QuickTest Professional Automation -> Identity -> and select The Interactive User";
+
+            string interactiveUser = "Interactive User";
+            string runAs = "RunAs";
+
+            try
+            {
+                var regKey = GetQuickTestProfessionalAutomationRegKey(RegistryView.Registry32);
+
+                if (regKey == null)
+                {
+                    regKey = GetQuickTestProfessionalAutomationRegKey(RegistryView.Registry64);
+                }
+
+                if (regKey == null)
+                    throw new Exception(@"Unable to find in registry SOFTWARE\Classes\AppID\{A67EB23A-1B8F-487D-8E38-A6A3DD150F0B");
+
+                object runAsKey = regKey.GetValue(runAs);
+
+                if (runAsKey == null || !runAsKey.ToString().Equals(interactiveUser))
+                {
+                    regKey.SetValue(runAs, interactiveUser);
+                }
+
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(errorMsg + "detailed error is : " + ex.Message);
+            }
+        }
+
+        public static RegistryKey GetQuickTestProfessionalAutomationRegKey(RegistryView registry32)
+        {
+            RegistryKey localKey = RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, RegistryView.Registry64);
+            localKey = localKey.OpenSubKey(@"SOFTWARE\Classes\AppID\{A67EB23A-1B8F-487D-8E38-A6A3DD150F0B}", true);
+
+            return localKey;
+        }
+
+        /// <summary>
+        /// Return the path of the available results folder for the parallel runner.
+        /// </summary>
+        /// <param name="testInfo"> The test information. </param>
+        /// <returns>
+        /// the path to the results folder 
+        /// </returns>
+        public static string GetNextResFolder(string reportPath, string resultFolderName)
+        {
+            // since ParallelRunner will store the report as "Res1...ResN"
+            // we need to know before parallel runner creates the result folder
+            // what the folder name will be
+            // so we know which result is ours(or if there was any result)
+            int resultFolderIndex = 1;
+
+            while (Directory.Exists(Path.Combine(reportPath, resultFolderName + resultFolderIndex)))
+            {
+                resultFolderIndex += 1;
+            }
+
+            return reportPath + "\\" + resultFolderName + resultFolderIndex;
+        }
+
         #region Report Related
+
+        /// <summary>
+        /// Set the error for a test when the report path is invalid.
+        /// </summary>
+        /// <param name="runResults"> The test run results </param>
+        /// <param name="errorReason"> The error reason </param>
+        /// <param name="testInfo"> The test informatio </param>
+        public static void SetTestReportPathError(TestRunResults runResults, ref string errorReason, TestInfo testInfo)
+        {
+            // Invalid path was provided, return useful description
+            errorReason = string.Format(Resources.InvalidReportPath, runResults.ReportLocation);
+
+            // since the report path is invalid, the test should fail
+            runResults.TestState = TestState.Error;
+            runResults.ErrorDesc = errorReason;
+
+            // output the error for the current test run
+            ConsoleWriter.WriteErrLine(runResults.ErrorDesc);
+
+            // include the error in the summary
+            ConsoleWriter.ErrorSummaryLines.Add(runResults.ErrorDesc);
+
+            // provide the appropriate exit code for the launcher
+            Environment.ExitCode = (int)Launcher.ExitCodeEnum.Failed;
+        }
+
+        /// <summary>
+        /// Try to set the custom report path for a given test.
+        /// </summary>
+        /// <param name="runResults"> The test run results </param>
+        /// <param name="testInfo"> The test information </param>
+        /// <param name="errorReason"> The error reason </param>
+        /// <returns> True if the report path was set, false otherwise </returns>
+        public static bool TrySetTestReportPath(TestRunResults runResults, TestInfo testInfo, ref string errorReason)
+        {
+            string testName = testInfo.TestName.Substring(testInfo.TestName.LastIndexOf('\\') + 1) + "_";
+            string reportLocation = Helper.GetNextResFolder(testInfo.ReportPath, testName);
+
+            // set the report location for the run results
+            runResults.ReportLocation = reportLocation;
+            try
+            {
+                Directory.CreateDirectory(runResults.ReportLocation);
+            }
+            catch (Exception)
+            {
+                SetTestReportPathError(runResults, ref errorReason, testInfo);
+                return false;
+            }
+
+            return true;
+        }
 
         public static string GetUftViewerInstallPath()
         {
@@ -589,7 +753,7 @@ namespace HpToolsLauncher
 
                 var element = root.XPathSelectElement("//Doc/Summary");
                 var lastStartRun = element.Attribute("sTime");
-                return lastStartRun.Value.Split(new char[] {' '})[0];
+                return lastStartRun.Value.Split(new char[] { ' ' })[0];
 
             }
             catch (Exception)
@@ -635,7 +799,7 @@ namespace HpToolsLauncher
                 runDesc.TestState = finalState;
                 return runDesc.TestState;
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 return TestState.Unknown;
             }
@@ -660,7 +824,6 @@ namespace HpToolsLauncher
             return runDesc.TestState;
         }
 
-
         public static TestState GetTestStateFromReport(TestRunResults runDesc)
         {
             try
@@ -674,6 +837,7 @@ namespace HpToolsLauncher
                 }
                 //if there is Result.xml -> UFT
                 //if there is sla.xml file -> LR
+                //if there is parallelrun_results.xml -> ParallelRunner
 
                 string[] resultFiles = Directory.GetFiles(runDesc.ReportLocation, "Results.xml",
                     SearchOption.TopDirectoryOnly);
@@ -692,18 +856,26 @@ namespace HpToolsLauncher
                     return GetTestStateFromLRReport(runDesc, resultFiles);
                 }
 
+                resultFiles = Directory.GetFiles(runDesc.ReportLocation, "parallelrun_results.html", SearchOption.TopDirectoryOnly);
+
+                // the overall status is given by parallel runner
+                // at the end of the run
+                if (resultFiles != null && resultFiles.Length > 0)
+                {
+                    return runDesc.TestState;
+                }
+
                 //no LR or UFT => error
                 runDesc.ErrorDesc = string.Format("no results file found for " + runDesc.TestName);
                 runDesc.TestState = TestState.Error;
                 return runDesc.TestState;
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 return TestState.Unknown;
             }
 
         }
-
 
         private static TestState GetTestStateFromLRReport(string resultFileFullPath, out string desc)
         {
@@ -761,7 +933,7 @@ namespace HpToolsLauncher
             TestState finalState = TestState.Unknown;
             desc = "";
             var status = "";
-            var doc = new XmlDocument {PreserveWhitespace = true};
+            var doc = new XmlDocument { PreserveWhitespace = true };
             doc.Load(resultsFileFullPath);
             string strFileName = Path.GetFileName(resultsFileFullPath);
             if (strFileName.Equals("run_results.xml"))
@@ -774,7 +946,7 @@ namespace HpToolsLauncher
                 }
 
                 var node = rNodeList.Item(0);
-                XmlNode resultNode = ((XmlElement) node).GetElementsByTagName("Result").Item(0);
+                XmlNode resultNode = ((XmlElement)node).GetElementsByTagName("Result").Item(0);
 
                 status = resultNode.InnerText;
 
@@ -794,7 +966,7 @@ namespace HpToolsLauncher
                 status = testStatusPathNode.Attributes["status"].Value;
             }
 
-            var result = (TestResult) Enum.Parse(typeof(TestResult), status);
+            var result = (TestResult)Enum.Parse(typeof(TestResult), status);
             if (result == TestResult.Passed || result == TestResult.Done)
             {
                 finalState = TestState.Passed;
@@ -823,7 +995,7 @@ namespace HpToolsLauncher
                 return string.Format("Could not find results file '{0}'", resultsFileFullPath);
             }
 
-            var doc = new XmlDocument {PreserveWhitespace = true};
+            var doc = new XmlDocument { PreserveWhitespace = true };
             doc.Load(resultsFileFullPath);
             var testStatusPathNode = doc.SelectSingleNode("//Report/Doc/NodeArgs");
             if (testStatusPathNode == null)
@@ -864,7 +1036,7 @@ namespace HpToolsLauncher
                 }
                 return;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
             }
             finally
@@ -961,10 +1133,17 @@ namespace HpToolsLauncher
 
         #endregion
 
-
+        public static void DeleteDirectory(string dirPath)
+        {
+            DirectoryInfo directory = Directory.CreateDirectory(dirPath);
+            foreach (FileInfo file in directory.GetFiles()) file.Delete();
+            foreach (DirectoryInfo subDirectory in directory.GetDirectories()) subDirectory.Delete(true);
+            Directory.Delete(dirPath);
+        }
     }
 
-    public class Stopper {
+    public class Stopper
+    {
         private readonly int _milliSeconds;
 
 

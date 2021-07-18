@@ -1,11 +1,35 @@
-﻿// (c) Copyright 2012 Hewlett-Packard Development Company, L.P. 
-// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+﻿/*
+ * Certain versions of software and/or documents ("Material") accessible here may contain branding from
+ * Hewlett-Packard Company (now HP Inc.) and Hewlett Packard Enterprise Company.  As of September 1, 2017,
+ * the Material is now offered by Micro Focus, a separately owned and operated company.  Any reference to the HP
+ * and Hewlett Packard Enterprise/HPE marks is historical in nature, and the HP and Hewlett Packard Enterprise/HPE
+ * marks are the property of their respective owners.
+ * __________________________________________________________________
+ * MIT License
+ *
+ * (c) Copyright 2012-2021 Micro Focus or one of its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+ * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+ * and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all copies or
+ * substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+ * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ * ___________________________________________________________________
+ */
 
+using System.Globalization;
 using System.IO;
-using System.Xml.Serialization;
 using System.Xml;
+using System.Xml.Serialization;
 
 namespace HpToolsLauncher
 {
@@ -33,7 +57,7 @@ namespace HpToolsLauncher
         }
 
         /// <summary>
-        /// converts all data from the test resutls in to the Junit xml format and writes the xml file to disk.
+        /// converts all data from the test results in to the Junit xml format and writes the xml file to disk.
         /// </summary>
         /// <param name="results"></param>
         public void CreateXmlFromRunResults(TestSuiteRunResults results)
@@ -61,11 +85,17 @@ namespace HpToolsLauncher
                     uftts.AddTestCase(ufttc);
                 }
             }
-            if(uftts.testcase.Length > 0)
+            if (uftts.testcase.Length > 0)
+            {
                 _testSuites.AddTestsuite(uftts);
+            }
+
 
             if (File.Exists(XmlName))
+            {
                 File.Delete(XmlName);
+            }
+
 
             using (Stream s = File.OpenWrite(XmlName))
             {
@@ -119,12 +149,13 @@ namespace HpToolsLauncher
             lrts.tests = totalTests.ToString();
             lrts.errors = totalErrors.ToString();
             lrts.failures = totalFailures.ToString();
-            lrts.time = testRes.Runtime.TotalSeconds.ToString();
+            lrts.time = testRes.Runtime.TotalSeconds.ToString(CultureInfo.InvariantCulture);
             return lrts;
         }
 
         private testcase CreateXmlFromUFTRunResults(TestRunResults testRes)
         {
+
             testcase tc = new testcase
             {
                 systemout = testRes.ConsoleOut,
@@ -133,7 +164,7 @@ namespace HpToolsLauncher
                 classname = "All-Tests." + ((testRes.TestGroup == null) ? "" : testRes.TestGroup.Replace(".", "_")),
                 name = testRes.TestPath,
                 type = testRes.TestType,
-                time = testRes.Runtime.TotalSeconds.ToString()
+                time = testRes.Runtime.TotalSeconds.ToString(CultureInfo.InvariantCulture)
             };
 
             if (!string.IsNullOrWhiteSpace(testRes.FailureDesc))
